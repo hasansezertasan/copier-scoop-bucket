@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.1...v0.1.2) (2026-10-18)
+
+
+### 🐛 Bug Fixes
+
+* record a full git URL as _src_path so Renovate can track template updates ([#49](https://github.com/hasansezertasan/copier-scoop-bucket/issues/49)) ([345e693](https://github.com/hasansezertasan/copier-scoop-bucket/commit/345e69324b259b2a79ca3b3a3c07d171ac921db5))
+
 ## [0.1.1](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.0...v0.1.1) (2026-10-18)
 
 
