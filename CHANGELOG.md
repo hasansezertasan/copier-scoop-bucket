@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.2...v0.1.3) (2026-10-19)
+
+
+### 📝 Documentation
+
+* document adopting the template in an existing bucket ([#54](https://github.com/hasansezertasan/copier-scoop-bucket/issues/54)) ([5163ec6](https://github.com/hasansezertasan/copier-scoop-bucket/commit/5163ec6956329eceabeae816aae943b60c5c52e3))
+
 ## [0.1.2](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.1...v0.1.2) (2026-10-18)
 
 
