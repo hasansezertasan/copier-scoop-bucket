@@ -47,11 +47,14 @@ skill, which you can also run directly (see the generated README).
 
 To bring a bucket that was not rendered from this template under it, render over
 the existing checkout from a clean working tree, then review the diff and revert
-what you want to keep:
+what you want to keep. Most of what the template adds is new, untracked files,
+so mark them with intent-to-add before diffing:
 
 ```sh
 uvx copier copy gh:hasansezertasan/copier-scoop-bucket . --overwrite
+git add --intent-to-add --all   # so new files show up in the diff
 git diff
+git status --short              # lists every new file the template added
 ```
 
 `--overwrite` replaces files without asking, so expect to revert or merge these:
@@ -63,7 +66,10 @@ git diff
 - `tests.yml` has an empty `$smoke` map. Add back the smoke command of any
   package whose CLI has no `version` task.
 - `bucket/.gitkeep` is added; delete it when the bucket already has manifests.
-- Regenerate the README catalog with `python scripts/gen_readme_packages.py`.
+- The README catalog is spliced between `BEGIN/END PACKAGES TABLE` markers. If
+  you keep your own README, copy the marker block from the rendered one first,
+  or `python scripts/gen_readme_packages.py` exits with an error; then run it
+  to regenerate the catalog.
 
 Commit `.copier-answers.yml` so `copier update` can merge later template changes.
 
