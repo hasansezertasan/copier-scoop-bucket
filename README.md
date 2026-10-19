@@ -67,6 +67,10 @@ git status --short              # lists every new file the template added
 - `tests.yml` has an empty `$smoke` map. Add back the smoke command of any
   package whose CLI has no `version` task.
 - `bucket/.gitkeep` is added; delete it when the bucket already has manifests.
+- The rendered workflows filter pushes and pull requests to `main`. If the
+  bucket's default branch is `master` or another name, rename it to `main` or
+  change the branch filters in `tests.yml` and `readme.yml`; otherwise the
+  install tests and the catalog check stop running on normal changes.
 - The README catalog is spliced between `BEGIN/END PACKAGES TABLE` markers. If
   you keep your own README, copy the marker block from the rendered one first,
   or `python scripts/gen_readme_packages.py` exits with an error; then run it
