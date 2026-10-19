@@ -10,15 +10,16 @@ updates, Windows install tests, and a generated package catalog.
 Your agent is the interface. Copy this prompt into your coding agent:
 
 ```text
-Install the scoop-bucket-skills skills in project scope: pick the best
-installation method for you from https://github.com/hasansezertasan/scoop-bucket-skills/blob/main/docs/installation.md
+Inspect the current directory first, then ask me whether to adopt it or create a
+new directory named scoop-bucket. Inside that directory, install the scoop-bucket-skills
+skills in project scope: pick the best installation method for you from
+https://github.com/hasansezertasan/scoop-bucket-skills/blob/main/docs/installation.md
 
 Then use its scoop-bucket-setup skill to set up a Scoop bucket from
-https://github.com/hasansezertasan/copier-scoop-bucket. Inspect the current
-directory first, then ask me whether to adopt it or create a new directory named
-scoop-bucket. Ask me for what you can't read from the repository (my GitHub
-owner, and for a new bucket its purpose and the first package), and ask before
-you create a repository, change settings or secrets, or push.
+https://github.com/hasansezertasan/copier-scoop-bucket. Ask me for what you can't read
+from the repository (my GitHub owner, and for a new bucket its purpose and the
+first package), and ask before you create a repository, change settings or
+secrets, or push.
 ```
 
 The prompt points the agent at the
