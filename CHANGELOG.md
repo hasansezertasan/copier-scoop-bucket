@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.3...v0.2.0) (2026-10-20)
+
+
+### 🚀 Features
+
+* **update_manifests:** honour checkver.regex and strip an uppercase V from GitHub tags ([#57](https://github.com/hasansezertasan/copier-scoop-bucket/issues/57)) ([f4958ea](https://github.com/hasansezertasan/copier-scoop-bucket/commit/f4958ea1d49d17a0b726cfe073d34fe26f33c1e1)), closes [#56](https://github.com/hasansezertasan/copier-scoop-bucket/issues/56)
+
 ## [0.1.3](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.2...v0.1.3) (2026-10-19)
 
 
