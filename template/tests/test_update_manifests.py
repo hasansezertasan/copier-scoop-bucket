@@ -200,6 +200,18 @@ class LatestGithubTest(unittest.TestCase):
                 with mock.patch.object(um, "_get_json", return_value={"tag_name": "v1.2.3-r4"}):
                     self.assertEqual(um._latest_github(checkver), expected)
 
+    def test_replace_reruns_the_regex_over_the_matched_text(self) -> None:
+        # Scoop does $re.Replace($match.Value, $replace): context outside the match is
+        # gone on the second pass, so a lookbehind no longer matches and the text stays.
+        for tag, regex, replace, expected in [
+            ("v1.2", r"(?<=v)(\d+\.\d+)", "$1.0", "1.2"),
+            ("x-release-5-y", r"release-(\d+)", "$1", "5"),
+        ]:
+            checkver = {"github": "https://github.com/acme/tool", "regex": regex, "replace": replace}
+            with self.subTest(tag=tag):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": tag}):
+                    self.assertEqual(um._latest_github(checkver), expected)
+
     def test_unusable_replace_raises(self) -> None:
         for replace in (5, "", "${9}"):
             checkver = {

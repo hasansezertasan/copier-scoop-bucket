@@ -74,7 +74,7 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     Follows Scoop's ``checkver.ps1`` where it can: the regex is case-sensitive (a
     plain .NET ``Regex``), accepts .NET-style ``(?<name>...)`` groups, and the
     version is group 1, then ``checkver.replace`` (``$1``, ``${name}``) applied
-    to the match if set, then the group named ``version`` if that is still empty.
+    to the matched text (as ``Regex.Replace`` does) if set, then the group named ``version`` if that is still empty.
     Only the subset of .NET regex that Python reads the same way is supported:
     a regex mixing named and unnamed groups is rejected (.NET numbers the
     unnamed ones first, Python by position), as are .NET-only constructs such as
@@ -100,7 +100,7 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     version = _group(match, "1") if match.re.groups else ""
     if replace is not None:
         try:
-            version = _expand_replace(match, replace)
+            version = pattern.sub(lambda m: _expand_replace(m, replace), match.group(0))
         except (IndexError, re.error) as exc:
             raise ValueError(f"{context} has no group for checkver.replace {replace!r}") from exc
     if not version and "version" in match.re.groupindex:
