@@ -54,14 +54,20 @@ def _latest_pypi(checkver: dict) -> str:
     return _get_json(checkver["url"])["info"]["version"]
 
 
+def _group(match: re.Match[str], ref: str) -> str:
+    """Return a capture by .NET reference: a name, or a number where named groups come last."""
+    if not ref.isdigit():
+        return match.group(ref) or ""
+    named = sorted(match.re.groupindex.values())
+    unnamed = [i for i in range(1, match.re.groups + 1) if i not in named]
+    return match.group((unnamed + named)[int(ref) - 1]) or ""
+
+
 def _expand_replace(match: re.Match[str], replace: str) -> str:
     """Expand a .NET-style replacement (``$1``, ``${1}``, ``${name}``, ``$$``) against ``match``."""
 
     def group(m: re.Match[str]) -> str:
-        if m.group("dollar"):
-            return "$"
-        ref = m.group("num") or m.group("name")
-        return match.group(int(ref) if ref.isdigit() else ref) or ""
+        return "$" if m.group("dollar") else _group(match, m.group("num") or m.group("name"))
 
     return re.sub(r"\$(?:(?P<dollar>\$)|(?P<num>\d+)|\{(?P<name>\w+)\})", group, replace)
 
@@ -73,9 +79,9 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     plain .NET ``Regex``), accepts .NET-style ``(?<name>...)`` groups, and the
     version is group 1, then ``checkver.replace`` (``$1``, ``${name}``) applied
     to the match if set, then the group named ``version`` if that is still empty.
-    Group numbers are positional, as in Python, not .NET's unnamed-first
-    numbering. Scoop runs the regex against the releases page, but this matches
-    the bare tag, so a regex anchored on ``/releases/tag/`` will not match.
+    Groups are numbered as in .NET: unnamed ones first, then named ones. Scoop
+    runs the regex against the releases page, but this matches the bare tag, so
+    a regex anchored on ``/releases/tag/`` will not match.
     """
     regex, replace = checkver["regex"], checkver.get("replace")
     context = f"checkver.regex {regex!r} for {repo} (tag {tag!r})"
@@ -89,7 +95,7 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
         raise ValueError(f"invalid {context}: {exc}") from exc
     if not match:
         raise ValueError(f"{context} does not match the tag")
-    version = match.group(1) if match.groups() else ""
+    version = _group(match, "1") if match.re.groups else ""
     if replace is not None:
         try:
             version = _expand_replace(match, replace)
@@ -278,6 +284,10 @@ def _update_manifest(path: Path) -> str | None:
     # predates the Windows build — skip this manifest with a warning rather than
     # writing a version whose download 404s (and don't fail the whole run).
     autoupdate = data.get("autoupdate", {})
+    # Scoop substitutes regex captures into autoupdate as $match<name>; this
+    # updater only knows $version, so refuse rather than write a literal "$match..." URL.
+    if re.search(r"\$match\w", json.dumps(autoupdate)):
+        raise ValueError(f"{path.name}: autoupdate uses $match variables, which are not supported")
     try:
         manifest_arch = data.get("architecture")
         has_manifest_arch = isinstance(manifest_arch, dict) and bool(manifest_arch)

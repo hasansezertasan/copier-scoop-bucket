@@ -166,6 +166,17 @@ class LatestGithubTest(unittest.TestCase):
                 with mock.patch.object(um, "_get_json", return_value={"tag_name": tag}):
                     self.assertEqual(um._latest_github(checkver), expected)
 
+    def test_dotnet_numbers_unnamed_groups_before_named(self) -> None:
+        # .NET: unnamed groups are numbered first, so ([\d.]+) is group 1 and prefix is group 2
+        regex = r"(?<prefix>release-)([\d.]+)"
+        for replace, expected in [(None, "1.2.3"), ("$1", "1.2.3"), ("${2}${1}", "release-1.2.3")]:
+            checkver = {"github": "https://github.com/acme/tool", "regex": regex}
+            if replace:
+                checkver["replace"] = replace
+            with self.subTest(replace=replace):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": "release-1.2.3"}):
+                    self.assertEqual(um._latest_github(checkver), expected)
+
     def test_replace_builds_version_from_captures(self) -> None:
         # (regex, replace, expected) against the tag v1.2.3-r4
         for regex, replace, expected in [
@@ -276,6 +287,18 @@ class UpdateManifestTest(unittest.TestCase):
         path = self._regex_manifest()
         with mock.patch.object(um, "_get_json", return_value={"tag_name": "release-0.0.9"}):
             self.assertIsNone(um._update_manifest(path))
+        self.assertEqual(json.loads(path.read_text())["version"], "0.1.0")
+
+    def test_autoupdate_match_variables_fail_loudly(self) -> None:
+        # Scoop's $match<name> substitution is not supported; never write a literal "$matchChannel" URL
+        data = copy.deepcopy(GITHUB)
+        autoupdate = data["autoupdate"]["architecture"]["64bit"]
+        autoupdate["url"] = autoupdate["url"].replace("widget-windows", "widget-$matchChannel")
+        path = _write(self._tmp(), "widget", data)
+        with mock.patch.object(um, "_latest_github", return_value="0.2.0"):
+            with self.assertRaises(ValueError) as ctx:
+                um._update_manifest(path)
+        self.assertIn("$match", str(ctx.exception))
         self.assertEqual(json.loads(path.read_text())["version"], "0.1.0")
 
     def test_github_skips_when_asset_missing(self) -> None:
