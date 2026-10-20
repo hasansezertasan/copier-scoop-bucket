@@ -124,6 +124,31 @@ class LatestGithubTest(unittest.TestCase):
         with mock.patch.object(um, "_get_json", return_value={"tag_name": "1.2.3"}):
             self.assertEqual(um._latest_github(checkver), "1.2.3")
 
+    def test_uppercase_v_is_stripped_without_regex(self) -> None:
+        checkver = {"github": "https://github.com/acme/tool"}
+        with mock.patch.object(um, "_get_json", return_value={"tag_name": "V1.2.3"}):
+            self.assertEqual(um._latest_github(checkver), "1.2.3")
+
+    def test_regex_extracts_version_from_tag(self) -> None:
+        for tag, regex, expected in [
+            ("release-1.2.3", r"release-([\d.]+)", "1.2.3"),
+            ("release/v1.0.0", r"release/v([\d.]+)", "1.0.0"),
+        ]:
+            checkver = {"github": "https://github.com/acme/tool", "regex": regex}
+            with self.subTest(tag=tag):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": tag}):
+                    self.assertEqual(um._latest_github(checkver), expected)
+
+    def test_unusable_regex_raises_with_context(self) -> None:
+        for regex in (r"nightly-([\d.]+)", r"release-[\d.]+", r"release-([\d.]+"):
+            checkver = {"github": "https://github.com/acme/tool", "regex": regex}
+            with self.subTest(regex=regex):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": "release-1.2.3"}):
+                    with self.assertRaises(ValueError) as ctx:
+                        um._latest_github(checkver)
+                for part in ("acme/tool", "release-1.2.3", repr(regex)):
+                    self.assertIn(part, str(ctx.exception))
+
     def test_missing_tag_name_raises_with_context(self) -> None:
         checkver = {"github": "https://github.com/acme/tool"}
         with mock.patch.object(um, "_get_json", return_value={"message": "rate limited"}):
@@ -162,6 +187,34 @@ class UpdateManifestTest(unittest.TestCase):
         arch = json.loads(path.read_text())["architecture"]["64bit"]
         self.assertIn("v0.2.0", arch["url"])
         self.assertEqual(arch["hash"], "f" * 64)
+
+    def _release_prefixed_manifest(self) -> Path:
+        data = json.loads(json.dumps(GITHUB))
+        data["checkver"]["regex"] = r"release-([\d.]+)"
+        autoupdate = data["autoupdate"]["architecture"]["64bit"]
+        autoupdate["url"] = autoupdate["url"].replace("v$version", "release-$version")
+        return _write(self._tmp(), "widget", data)
+
+    def test_github_regex_version_feeds_url_rebuild(self) -> None:
+        path = self._release_prefixed_manifest()
+        with (
+            mock.patch.object(um, "_get_json", return_value={"tag_name": "release-0.2.0"}),
+            mock.patch.object(um, "_sha256", return_value="f" * 64),
+        ):
+            note = um._update_manifest(path)
+        self.assertEqual(note, "`0.1.0` → `0.2.0`")
+        written = json.loads(path.read_text())
+        self.assertEqual(written["version"], "0.2.0")
+        self.assertEqual(
+            written["architecture"]["64bit"]["url"],
+            "https://github.com/o/r/releases/download/release-0.2.0/widget-windows.zip",
+        )
+
+    def test_github_regex_version_is_checked_for_downgrade(self) -> None:
+        path = self._release_prefixed_manifest()
+        with mock.patch.object(um, "_get_json", return_value={"tag_name": "release-0.0.9"}):
+            self.assertIsNone(um._update_manifest(path))
+        self.assertEqual(json.loads(path.read_text())["version"], "0.1.0")
 
     def test_github_skips_when_asset_missing(self) -> None:
         # A release whose zip isn't published yet 404s on hashing; skip, no write.
