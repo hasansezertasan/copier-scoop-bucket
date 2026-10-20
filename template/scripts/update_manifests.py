@@ -69,13 +69,13 @@ def _expand_replace(match: re.Match[str], replace: str) -> str:
 def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     """Derive the version from a release tag with ``checkver.regex`` (and ``replace``).
 
-    Follows Scoop where it can: matches case-insensitively (PowerShell ``-match``),
-    accepts .NET-style ``(?<name>...)`` groups, takes the group named ``version``
-    when there is one and group 1 otherwise, and builds the version from
-    ``checkver.replace`` (``$1``, ``${name}``) when that is set. Group numbers
-    are positional, as in Python, not .NET's unnamed-first numbering. Scoop runs
-    the regex against the releases page, but this matches the bare tag, so a
-    regex anchored on ``/releases/tag/`` will not match.
+    Follows Scoop's ``checkver.ps1`` where it can: the regex is case-sensitive (a
+    plain .NET ``Regex``), accepts .NET-style ``(?<name>...)`` groups, and the
+    version is group 1, then ``checkver.replace`` (``$1``, ``${name}``) applied
+    to the match if set, then the group named ``version`` if that is still empty.
+    Group numbers are positional, as in Python, not .NET's unnamed-first
+    numbering. Scoop runs the regex against the releases page, but this matches
+    the bare tag, so a regex anchored on ``/releases/tag/`` will not match.
     """
     regex, replace = checkver["regex"], checkver.get("replace")
     context = f"checkver.regex {regex!r} for {repo} (tag {tag!r})"
@@ -84,22 +84,19 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     if replace is not None and (not isinstance(replace, str) or not replace):
         raise ValueError(f"checkver.replace {replace!r} for {repo} must be a non-empty string")
     try:
-        match = re.search(re.sub(r"\(\?<(?![=!])", "(?P<", regex), tag, re.IGNORECASE)
+        match = re.search(re.sub(r"\(\?<(?![=!])", "(?P<", regex), tag)
     except re.error as exc:
         raise ValueError(f"invalid {context}: {exc}") from exc
     if not match:
         raise ValueError(f"{context} does not match the tag")
+    version = match.group(1) if match.groups() else ""
     if replace is not None:
         try:
             version = _expand_replace(match, replace)
         except (IndexError, re.error) as exc:
             raise ValueError(f"{context} has no group for checkver.replace {replace!r}") from exc
-    elif "version" in match.re.groupindex:
+    if not version and "version" in match.re.groupindex:
         version = match.group("version")
-    elif match.groups():
-        version = match.group(1)
-    else:
-        raise ValueError(f"{context} has no capture group for the version")
     if not version:
         raise ValueError(f"{context} yields an empty version")
     return version

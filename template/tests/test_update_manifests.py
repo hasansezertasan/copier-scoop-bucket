@@ -134,10 +134,8 @@ class LatestGithubTest(unittest.TestCase):
         for tag, regex, expected in [
             ("release-1.2.3", r"release-([\d.]+)", "1.2.3"),
             ("release/v1.0.0", r"release/v([\d.]+)", "1.0.0"),
-            # Scoop matches case-insensitively (PowerShell -match)
-            ("release/V1.0.0", r"release/v([\d.]+)", "1.0.0"),
-            ("Release-1.2.3", r"release-([\d.]+)", "1.2.3"),
-            ("V1.2.3", r"v([\d.]+)", "1.2.3"),
+            ("V1.2.3", r"[vV]([\d.]+)", "1.2.3"),
+            ("Release-1.2.3", r"(?i)release-([\d.]+)", "1.2.3"),
         ]:
             checkver = {"github": "https://github.com/acme/tool", "regex": regex}
             with self.subTest(tag=tag):
@@ -158,7 +156,9 @@ class LatestGithubTest(unittest.TestCase):
         # Scoop documents .NET-style (?<name>...) and prefers a group named "version".
         for tag, regex, expected in [
             ("release-1.2.3", r"release-(?<version>[\d.]+)", "1.2.3"),
-            ("release-1.2.3", r"(release)-(?<version>[\d.]+)", "1.2.3"),
+            # Scoop takes group 1 first and falls back to "version" only when it is empty
+            ("release-1.2.3", r"(release)-(?<version>[\d.]+)", "release"),
+            ("-1.2.3", r"(x?)-(?<version>[\d.]+)", "1.2.3"),
             ("release-1.2.3", r"(?<=release-)([\d.]+)", "1.2.3"),  # lookbehind is not a group
         ]:
             checkver = {"github": "https://github.com/acme/tool", "regex": regex}
@@ -194,6 +194,13 @@ class LatestGithubTest(unittest.TestCase):
                     with self.assertRaises(ValueError) as ctx:
                         um._latest_github(checkver)
                 self.assertIn("acme/tool", str(ctx.exception))
+
+    def test_regex_is_case_sensitive_like_scoop(self) -> None:
+        # Scoop builds a plain .NET Regex, so opting in to case-insensitivity is the manifest's job
+        checkver = {"github": "https://github.com/acme/tool", "regex": r"release/v([\d.]+)"}
+        with mock.patch.object(um, "_get_json", return_value={"tag_name": "release/V1.0.0"}):
+            with self.assertRaises(ValueError):
+                um._latest_github(checkver)
 
     def test_non_string_or_empty_regex_raises(self) -> None:
         for regex in (None, 5, ""):
