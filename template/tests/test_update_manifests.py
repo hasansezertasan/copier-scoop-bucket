@@ -154,6 +154,47 @@ class LatestGithubTest(unittest.TestCase):
                 for part in ("acme/tool", "release-1.2.3", repr(regex)):
                     self.assertIn(part, str(ctx.exception))
 
+    def test_dotnet_named_group_is_the_version(self) -> None:
+        # Scoop documents .NET-style (?<name>...) and prefers a group named "version".
+        for tag, regex, expected in [
+            ("release-1.2.3", r"release-(?<version>[\d.]+)", "1.2.3"),
+            ("release-1.2.3", r"(release)-(?<version>[\d.]+)", "1.2.3"),
+            ("release-1.2.3", r"(?<=release-)([\d.]+)", "1.2.3"),  # lookbehind is not a group
+        ]:
+            checkver = {"github": "https://github.com/acme/tool", "regex": regex}
+            with self.subTest(regex=regex):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": tag}):
+                    self.assertEqual(um._latest_github(checkver), expected)
+
+    def test_replace_builds_version_from_captures(self) -> None:
+        # (regex, replace, expected) against the tag v1.2.3-r4
+        for regex, replace, expected in [
+            (r"v(\d+)\.(\d+)\.(\d+)-r(\d+)", "${1}.${2}.${3}", "1.2.3"),
+            (r"v(\d+)\.(\d+)\.(\d+)-r(\d+)", "$1.$2.$3-r$4", "1.2.3-r4"),
+            (r"v(?<major>\d+)\.(?<minor>\d+)", "${major}-${minor}-$$", "1-2-$"),
+        ]:
+            checkver = {
+                "github": "https://github.com/acme/tool",
+                "regex": regex,
+                "replace": replace,
+            }
+            with self.subTest(replace=replace):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": "v1.2.3-r4"}):
+                    self.assertEqual(um._latest_github(checkver), expected)
+
+    def test_unusable_replace_raises(self) -> None:
+        for replace in (5, "", "${9}"):
+            checkver = {
+                "github": "https://github.com/acme/tool",
+                "regex": r"v(\d+)",
+                "replace": replace,
+            }
+            with self.subTest(replace=replace):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": "v1"}):
+                    with self.assertRaises(ValueError) as ctx:
+                        um._latest_github(checkver)
+                self.assertIn("acme/tool", str(ctx.exception))
+
     def test_non_string_or_empty_regex_raises(self) -> None:
         for regex in (None, 5, ""):
             checkver = {"github": "https://github.com/acme/tool", "regex": regex}

@@ -54,25 +54,55 @@ def _latest_pypi(checkver: dict) -> str:
     return _get_json(checkver["url"])["info"]["version"]
 
 
-def _version_from_tag(repo: str, tag: str, regex: object) -> str:
-    """Apply ``checkver.regex`` to a release tag; the first capture group is the version.
+def _expand_replace(match: re.Match[str], replace: str) -> str:
+    """Expand a .NET-style replacement (``$1``, ``${1}``, ``${name}``, ``$$``) against ``match``."""
 
-    Matches case-insensitively, like Scoop's PowerShell ``-match``. Scoop runs the
-    regex against the releases page, but this matches the bare tag, so a regex
-    anchored on ``/releases/tag/`` will not match.
+    def group(m: re.Match[str]) -> str:
+        if m.group("dollar"):
+            return "$"
+        ref = m.group("num") or m.group("name")
+        return match.group(int(ref) if ref.isdigit() else ref) or ""
+
+    return re.sub(r"\$(?:(?P<dollar>\$)|(?P<num>\d+)|\{(?P<name>\w+)\})", group, replace)
+
+
+def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
+    """Derive the version from a release tag with ``checkver.regex`` (and ``replace``).
+
+    Follows Scoop where it can: matches case-insensitively (PowerShell ``-match``),
+    accepts .NET-style ``(?<name>...)`` groups, takes the group named ``version``
+    when there is one and group 1 otherwise, and builds the version from
+    ``checkver.replace`` (``$1``, ``${name}``) when that is set. Group numbers
+    are positional, as in Python, not .NET's unnamed-first numbering. Scoop runs
+    the regex against the releases page, but this matches the bare tag, so a
+    regex anchored on ``/releases/tag/`` will not match.
     """
+    regex, replace = checkver["regex"], checkver.get("replace")
     context = f"checkver.regex {regex!r} for {repo} (tag {tag!r})"
     if not isinstance(regex, str) or not regex:
         raise ValueError(f"{context} must be a non-empty string")
+    if replace is not None and (not isinstance(replace, str) or not replace):
+        raise ValueError(f"checkver.replace {replace!r} for {repo} must be a non-empty string")
     try:
-        match = re.search(regex, tag, re.IGNORECASE)
+        match = re.search(re.sub(r"\(\?<(?![=!])", "(?P<", regex), tag, re.IGNORECASE)
     except re.error as exc:
         raise ValueError(f"invalid {context}: {exc}") from exc
     if not match:
         raise ValueError(f"{context} does not match the tag")
-    if not match.groups() or not match.group(1):
-        raise ValueError(f"{context} has no non-empty capture group for the version")
-    return match.group(1)
+    if replace is not None:
+        try:
+            version = _expand_replace(match, replace)
+        except (IndexError, re.error) as exc:
+            raise ValueError(f"{context} has no group for checkver.replace {replace!r}") from exc
+    elif "version" in match.re.groupindex:
+        version = match.group("version")
+    elif match.groups():
+        version = match.group(1)
+    else:
+        raise ValueError(f"{context} has no capture group for the version")
+    if not version:
+        raise ValueError(f"{context} yields an empty version")
+    return version
 
 
 def _latest_github(checkver: dict) -> str:
@@ -85,7 +115,7 @@ def _latest_github(checkver: dict) -> str:
         raise ValueError(f"GitHub API error for {repo}: {msg}")
     tag = data["tag_name"]
     if "regex" in checkver:
-        return _version_from_tag(repo, tag, checkver["regex"])
+        return _version_from_tag(repo, tag, checkver)
     return tag[1:] if re.fullmatch(r"[vV]\d.*", tag) else tag
 
 
