@@ -55,12 +55,8 @@ def _latest_pypi(checkver: dict) -> str:
 
 
 def _group(match: re.Match[str], ref: str) -> str:
-    """Return a capture by .NET reference: a name, or a number where named groups come last."""
-    if not ref.isdigit():
-        return match.group(ref) or ""
-    named = sorted(match.re.groupindex.values())
-    unnamed = [i for i in range(1, match.re.groups + 1) if i not in named]
-    return match.group((unnamed + named)[int(ref) - 1]) or ""
+    """Return a capture by number or name; an unmatched optional group is empty."""
+    return match.group(int(ref) if ref.isdigit() else ref) or ""
 
 
 def _expand_replace(match: re.Match[str], replace: str) -> str:
@@ -79,9 +75,12 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     plain .NET ``Regex``), accepts .NET-style ``(?<name>...)`` groups, and the
     version is group 1, then ``checkver.replace`` (``$1``, ``${name}``) applied
     to the match if set, then the group named ``version`` if that is still empty.
-    Groups are numbered as in .NET: unnamed ones first, then named ones. Scoop
-    runs the regex against the releases page, but this matches the bare tag, so
-    a regex anchored on ``/releases/tag/`` will not match.
+    Only the subset of .NET regex that Python reads the same way is supported:
+    a regex mixing named and unnamed groups is rejected (.NET numbers the
+    unnamed ones first, Python by position), as are .NET-only constructs such as
+    ``\\k<name>``, ``(?'name'...)`` and balancing groups. Scoop runs the regex
+    against the releases page, but this matches the bare tag, so a regex
+    anchored on ``/releases/tag/`` will not match.
     """
     regex, replace = checkver["regex"], checkver.get("replace")
     context = f"checkver.regex {regex!r} for {repo} (tag {tag!r})"
@@ -90,9 +89,12 @@ def _version_from_tag(repo: str, tag: str, checkver: dict) -> str:
     if replace is not None and (not isinstance(replace, str) or not replace):
         raise ValueError(f"checkver.replace {replace!r} for {repo} must be a non-empty string")
     try:
-        match = re.search(re.sub(r"\(\?<(?![=!])", "(?P<", regex), tag)
+        pattern = re.compile(re.sub(r"\(\?<(?![=!])", "(?P<", regex))
     except re.error as exc:
-        raise ValueError(f"invalid {context}: {exc}") from exc
+        raise ValueError(f"invalid or unsupported {context}: {exc}") from exc
+    if pattern.groupindex and pattern.groups > len(pattern.groupindex):
+        raise ValueError(f"unsupported {context}: mixes named and unnamed groups")
+    match = pattern.search(tag)
     if not match:
         raise ValueError(f"{context} does not match the tag")
     version = _group(match, "1") if match.re.groups else ""

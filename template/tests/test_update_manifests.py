@@ -157,8 +157,10 @@ class LatestGithubTest(unittest.TestCase):
         for tag, regex, expected in [
             ("release-1.2.3", r"release-(?<version>[\d.]+)", "1.2.3"),
             # Scoop takes group 1 first and falls back to "version" only when it is empty
-            ("release-1.2.3", r"(release)-(?<version>[\d.]+)", "release"),
-            ("-1.2.3", r"(x?)-(?<version>[\d.]+)", "1.2.3"),
+            ("release-1.2.3", r"(?<prefix>release)-(?<version>[\d.]+)", "release"),
+            ("-1.2.3", r"(?<opt>x?)-(?<version>[\d.]+)", "1.2.3"),
+            # numeric backreferences agree with .NET when every group is named
+            ("1.2-1.2", r"(?<version>[\d.]+)-\1", "1.2"),
             ("release-1.2.3", r"(?<=release-)([\d.]+)", "1.2.3"),  # lookbehind is not a group
         ]:
             checkver = {"github": "https://github.com/acme/tool", "regex": regex}
@@ -166,16 +168,21 @@ class LatestGithubTest(unittest.TestCase):
                 with mock.patch.object(um, "_get_json", return_value={"tag_name": tag}):
                     self.assertEqual(um._latest_github(checkver), expected)
 
-    def test_dotnet_numbers_unnamed_groups_before_named(self) -> None:
-        # .NET: unnamed groups are numbered first, so ([\d.]+) is group 1 and prefix is group 2
-        regex = r"(?<prefix>release-)([\d.]+)"
-        for replace, expected in [(None, "1.2.3"), ("$1", "1.2.3"), ("${2}${1}", "release-1.2.3")]:
+    def test_unsupported_regex_constructs_raise(self) -> None:
+        # Mixed named/unnamed groups number differently in .NET and Python, and the
+        # .NET-only constructs have no Python translation: reject rather than guess.
+        for regex in (
+            r"(?<prefix>release-)([\d.]+)",
+            r"(?<v>[\d.]+)-\k<v>",
+            r"(?'v'[\d.]+)",
+            r"(?<a-b>[\d.]+)",
+        ):
             checkver = {"github": "https://github.com/acme/tool", "regex": regex}
-            if replace:
-                checkver["replace"] = replace
-            with self.subTest(replace=replace):
+            with self.subTest(regex=regex):
                 with mock.patch.object(um, "_get_json", return_value={"tag_name": "release-1.2.3"}):
-                    self.assertEqual(um._latest_github(checkver), expected)
+                    with self.assertRaises(ValueError) as ctx:
+                        um._latest_github(checkver)
+                self.assertIn("acme/tool", str(ctx.exception))
 
     def test_replace_builds_version_from_captures(self) -> None:
         # (regex, replace, expected) against the tag v1.2.3-r4
