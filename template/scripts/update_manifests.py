@@ -11,9 +11,8 @@ supported:
   ``version``, each per-arch ``url`` (rebuilt from the
   ``autoupdate`` template), and the ``hash`` (sha256 of the freshly downloaded
   asset) all change. The version is the latest release tag with a leading
-  ``v``/``V`` stripped, or, when ``checkver.regex`` is set, that regex's first
-  capture group applied to the bare tag (as opposed to Scoop, which matches the
-  releases page). A regex that does not match fails the manifest.
+  ``v``/``V`` stripped, or the first capture group of ``checkver.regex`` when
+  set (see ``_version_from_tag``).
 
 Run with no args to check every manifest; pass a package name to limit the run
 to that family — ``example`` matches both ``example`` and ``example-pipx`` (the
@@ -55,15 +54,18 @@ def _latest_pypi(checkver: dict) -> str:
     return _get_json(checkver["url"])["info"]["version"]
 
 
-def _version_from_tag(repo: str, tag: str, regex: str) -> str:
+def _version_from_tag(repo: str, tag: str, regex: object) -> str:
     """Apply ``checkver.regex`` to a release tag; the first capture group is the version.
 
-    Unlike Scoop, which matches the regex against the releases page, this matches
-    the bare tag, so a regex anchored on ``/releases/tag/`` will not match.
+    Matches case-insensitively, like Scoop's PowerShell ``-match``. Scoop runs the
+    regex against the releases page, but this matches the bare tag, so a regex
+    anchored on ``/releases/tag/`` will not match.
     """
     context = f"checkver.regex {regex!r} for {repo} (tag {tag!r})"
+    if not isinstance(regex, str) or not regex:
+        raise ValueError(f"{context} must be a non-empty string")
     try:
-        match = re.search(regex, tag)
+        match = re.search(regex, tag, re.IGNORECASE)
     except re.error as exc:
         raise ValueError(f"invalid {context}: {exc}") from exc
     if not match:
@@ -75,9 +77,7 @@ def _version_from_tag(repo: str, tag: str, regex: str) -> str:
 
 def _latest_github(checkver: dict) -> str:
     # checkver.github is the repo homepage; the latest *release* tag is the
-    # version (drafts are excluded by the API, which is what we want). With
-    # checkver.regex, its first capture group is the version, as in Scoop;
-    # otherwise a leading ``v``/``V`` is stripped.
+    # version (drafts are excluded by the API, which is what we want).
     repo = checkver["github"].rstrip("/").removeprefix("https://github.com/")
     data = _get_json(f"https://api.github.com/repos/{repo}/releases/latest")
     if "tag_name" not in data:

@@ -5,6 +5,7 @@ Run with ``python -m unittest discover -s tests`` from the repo root.
 
 from __future__ import annotations
 
+import copy
 import io
 import json
 import sys
@@ -133,6 +134,10 @@ class LatestGithubTest(unittest.TestCase):
         for tag, regex, expected in [
             ("release-1.2.3", r"release-([\d.]+)", "1.2.3"),
             ("release/v1.0.0", r"release/v([\d.]+)", "1.0.0"),
+            # Scoop matches case-insensitively (PowerShell -match)
+            ("release/V1.0.0", r"release/v([\d.]+)", "1.0.0"),
+            ("Release-1.2.3", r"release-([\d.]+)", "1.2.3"),
+            ("V1.2.3", r"v([\d.]+)", "1.2.3"),
         ]:
             checkver = {"github": "https://github.com/acme/tool", "regex": regex}
             with self.subTest(tag=tag):
@@ -148,6 +153,15 @@ class LatestGithubTest(unittest.TestCase):
                         um._latest_github(checkver)
                 for part in ("acme/tool", "release-1.2.3", repr(regex)):
                     self.assertIn(part, str(ctx.exception))
+
+    def test_non_string_or_empty_regex_raises(self) -> None:
+        for regex in (None, 5, ""):
+            checkver = {"github": "https://github.com/acme/tool", "regex": regex}
+            with self.subTest(regex=regex):
+                with mock.patch.object(um, "_get_json", return_value={"tag_name": "v1.2.3"}):
+                    with self.assertRaises(ValueError) as ctx:
+                        um._latest_github(checkver)
+                self.assertIn("acme/tool", str(ctx.exception))
 
     def test_missing_tag_name_raises_with_context(self) -> None:
         checkver = {"github": "https://github.com/acme/tool"}
@@ -188,15 +202,15 @@ class UpdateManifestTest(unittest.TestCase):
         self.assertIn("v0.2.0", arch["url"])
         self.assertEqual(arch["hash"], "f" * 64)
 
-    def _release_prefixed_manifest(self) -> Path:
-        data = json.loads(json.dumps(GITHUB))
+    def _regex_manifest(self) -> Path:
+        data = copy.deepcopy(GITHUB)
         data["checkver"]["regex"] = r"release-([\d.]+)"
         autoupdate = data["autoupdate"]["architecture"]["64bit"]
         autoupdate["url"] = autoupdate["url"].replace("v$version", "release-$version")
         return _write(self._tmp(), "widget", data)
 
     def test_github_regex_version_feeds_url_rebuild(self) -> None:
-        path = self._release_prefixed_manifest()
+        path = self._regex_manifest()
         with (
             mock.patch.object(um, "_get_json", return_value={"tag_name": "release-0.2.0"}),
             mock.patch.object(um, "_sha256", return_value="f" * 64),
@@ -211,7 +225,7 @@ class UpdateManifestTest(unittest.TestCase):
         )
 
     def test_github_regex_version_is_checked_for_downgrade(self) -> None:
-        path = self._release_prefixed_manifest()
+        path = self._regex_manifest()
         with mock.patch.object(um, "_get_json", return_value={"tag_name": "release-0.0.9"}):
             self.assertIsNone(um._update_manifest(path))
         self.assertEqual(json.loads(path.read_text())["version"], "0.1.0")
