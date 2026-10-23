@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.2.0...v0.2.1) (2026-10-23)
+
+
+### 🐛 Bug Fixes
+
+* state the Python 3.11 floor of the generated pyupgrade hook ([#62](https://github.com/hasansezertasan/copier-scoop-bucket/issues/62)) ([a885747](https://github.com/hasansezertasan/copier-scoop-bucket/commit/a885747fd28e66fff5c8e79c585b14d41c1fce72))
+
 ## [0.2.0](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.1.3...v0.2.0) (2026-10-20)
 
 
