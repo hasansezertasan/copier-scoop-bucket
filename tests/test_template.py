@@ -12,6 +12,14 @@ def test_template_renders_with_defaults(tmp_path, versioned_template):
     assert (dest / ".copier-answers.yml").exists()
 
 
+def test_readme_links_back_to_the_template(tmp_path, versioned_template):
+    dest = tmp_path / "project"
+    copier("copy", "--defaults", *ANSWERS, str(versioned_template), str(dest), cwd=tmp_path)
+    assert (dest / "README.md").read_text().rstrip().endswith(
+        "Generated from [copier-scoop-bucket](https://github.com/hasansezertasan/copier-scoop-bucket)."
+    )
+
+
 def test_update_to_a_new_version_only_moves_the_answers_commit(tmp_path, versioned_template):
     dest = tmp_path / "project"
     copier("copy", "--defaults", *ANSWERS, str(versioned_template), str(dest), cwd=tmp_path)
