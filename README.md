@@ -61,6 +61,10 @@ git status --short              # lists every new file the template added
 `--overwrite` replaces files without asking, so expect to revert or merge these:
 
 - `README.md`, `AGENTS.md` and `LICENSE` are overwritten; keep your own versions.
+- `.gitignore` and `cobo.lock` are skipped when they already exist (the template seeds
+  them once), so an existing `.gitignore` is kept beside a freshly written `cobo.lock`
+  and `cobo check --strict` fails. Delete your `.gitignore` before rendering so the
+  template installs its matched pair, then re-add your own ignores below the cobo block.
 - `scripts/noop.ps1` changes. Every shim manifest hard-codes its sha256, so keep
   your file, or re-hash every shim. Keeping it makes `copier update` report a
   conflict on that file each time.
