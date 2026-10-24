@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.2.1...v0.3.0) (2026-10-24)
+
+
+### 🚀 Features
+
+* add a back reference to the template in the generated README ([#64](https://github.com/hasansezertasan/copier-scoop-bucket/issues/64)) ([6eda7a6](https://github.com/hasansezertasan/copier-scoop-bucket/commit/6eda7a69c98718d4e2e987f2228eb2829383d12f))
+* leave the cobo-managed gitignore and lockfile to the generated repository ([#67](https://github.com/hasansezertasan/copier-scoop-bucket/issues/67)) ([35ffc84](https://github.com/hasansezertasan/copier-scoop-bucket/commit/35ffc84766bc990ccc83c130adf5f334d78f00b9))
+
+
+### 📝 Documentation
+
+* put the template back reference under a Credits heading ([#66](https://github.com/hasansezertasan/copier-scoop-bucket/issues/66)) ([8a2c3ef](https://github.com/hasansezertasan/copier-scoop-bucket/commit/8a2c3efc319027226c44253a2395105ea536158b))
+* tell adopters to remove the lockfile with the ignore file ([#68](https://github.com/hasansezertasan/copier-scoop-bucket/issues/68)) ([13714fb](https://github.com/hasansezertasan/copier-scoop-bucket/commit/13714fbd538bf3bb5d0400c777e324eceb124965))
+
 ## [0.2.1](https://github.com/hasansezertasan/copier-scoop-bucket/compare/v0.2.0...v0.2.1) (2026-10-23)
 
 
