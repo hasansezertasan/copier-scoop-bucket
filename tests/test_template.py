@@ -36,3 +36,40 @@ def test_update_to_a_new_version_only_moves_the_answers_commit(tmp_path, version
     assert changed == {".copier-answers.yml"}
     answers = yaml.safe_load((dest / ".copier-answers.yml").read_text())
     assert answers["_commit"] == "v0.0.1"
+
+
+# Rendered name -> the template file it comes from.
+COBO_MANAGED = {
+    ".gitignore": ".gitignore.jinja",
+    ".gitattributes": ".gitattributes",
+    ".editorconfig": ".editorconfig",
+    "cobo.lock": "cobo.lock",
+}
+
+
+def test_update_leaves_cobo_managed_files_alone(tmp_path, versioned_template):
+    dest = tmp_path / "project"
+    result = copier("copy", "--defaults", *ANSWERS, str(versioned_template), str(dest), cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    for rendered in COBO_MANAGED:
+        assert (dest / rendered).is_file(), rendered
+    git("init", "-q", "-b", "main", cwd=dest)
+    git("add", "-A", cwd=dest)
+    git("commit", "-q", "-m", "chore: render", cwd=dest)
+
+    for rendered in COBO_MANAGED:
+        (dest / rendered).write_text("# cobo-managed\n")
+    git("commit", "-q", "-am", "chore: manage boilerplate with cobo", cwd=dest)
+
+    for source in COBO_MANAGED.values():
+        path = versioned_template / "template" / source
+        path.write_text(path.read_text() + "# added in v0.0.1\n")
+    git("commit", "-q", "-am", "feat: extend the boilerplate", cwd=versioned_template)
+    git("tag", "v0.0.1", cwd=versioned_template)
+
+    result = copier("update", "--defaults", "--skip-answered", cwd=dest)
+    assert result.returncode == 0, result.stderr
+    for rendered in COBO_MANAGED:
+        assert (dest / rendered).read_text() == "# cobo-managed\n", rendered
+    changed = {line[3:] for line in git("status", "--porcelain", cwd=dest).stdout.splitlines()}
+    assert changed == {".copier-answers.yml"}
